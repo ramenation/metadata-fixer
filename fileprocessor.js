@@ -55,7 +55,7 @@ function getMatchingImageFileName(jsonFileName, imageDirectory) {
     }
     return null;
 }
-
+/*
 function renameFilesAndUpdateJson(inputDirectory, outputDirectory, jsonDirectory, imageDirectory) {
     const jsonFiles = fs.readdirSync(path.join(inputDirectory, jsonDirectory)).filter(file => file.endsWith('.json'));
     const shuffledNumbers = shuffleArray([...Array(jsonFiles.length).keys()].map(i => i + 1));
@@ -96,7 +96,7 @@ function renameFilesAndUpdateJson(inputDirectory, outputDirectory, jsonDirectory
     });
 }
 
-
+*/
 
 
 function processDirectories(startDirectory, outputDirectory) {
@@ -162,54 +162,68 @@ function processCsvToJSON(outputDirectory) {
         });
 }
 
-async function mergeDirectoriesAndProcessFiles(inputDir1, inputDir2, outputDir) {
-    const allJsonFiles = [];
-    const allImageFiles = [];
+const mergeDirectoriesAndProcessFiles = async (inputDir1, inputDir2, outputDir) => {
+    const totalJsonFiles = getJsonFiles(inputDir1).length + getJsonFiles(inputDir2).length;
+    const shuffledNumbers = shuffleArray([...Array(totalJsonFiles).keys()].map(i => i + 1));
 
-    const processDirectoryFiles = async (directory) => {
-        const { jsonDirectory, imageDirectory } = validateDirectoryStructure(directory);
+    // Ensure the output directory and its subdirectories exist
+    ensureDirectoryExistence(outputDir);
+    
+    const { jsonDirectory, imageDirectory } = validateDirectoryStructure(inputDir1); // Assuming both input directories have the same structure
+    ensureDirectoryExistence(path.join(outputDir, jsonDirectory));
+    ensureDirectoryExistence(path.join(outputDir, imageDirectory));
 
-        const jsonFiles = fs.readdirSync(path.join(directory, jsonDirectory)).filter(file => file.endsWith('.json'));
-        const imageFiles = fs.readdirSync(path.join(directory, imageDirectory)).filter(file => file.endsWith('.jpg') || file.endsWith('.png'));
+    let lastUsedIndex = await processDirectoryFiles(inputDir1, outputDir, shuffledNumbers, 0);
+    await processDirectoryFiles(inputDir2, outputDir, shuffledNumbers, lastUsedIndex);
+    
+   
+    console.log('Files have been processed');
+    alert('Files have been processed and saved to the output directory!');
+};
 
-        allJsonFiles.push(...jsonFiles.map(file => path.join(directory, jsonDirectory, file)));
-        allImageFiles.push(...imageFiles.map(file => path.join(directory, imageDirectory, file)));
-    };
+const getJsonFiles = (directory) => {
+    const { jsonDirectory } = validateDirectoryStructure(directory);
+    return fs.readdirSync(path.join(directory, jsonDirectory)).filter(file => file.endsWith('.json'));
+};
 
-    await processDirectoryFiles(inputDir1);
-    await processDirectoryFiles(inputDir2);
+const processDirectoryFiles = async (directory, outputDir, numbers, startIndex) => {
+    const { jsonDirectory, imageDirectory } = validateDirectoryStructure(directory);
 
-    const totalFiles = allJsonFiles.length;
-    const shuffledNumbers = shuffleArray([...Array(totalFiles).keys()].map(i => i + 1));
+    const jsonFiles = getJsonFiles(directory);
+    for (let i = 0; i < jsonFiles.length; i++) {
+        const currentNumber = numbers[startIndex + i];
+        await renameFilesAndUpdateJson(directory, outputDir, jsonFiles[i], jsonDirectory, imageDirectory, currentNumber);
+    }
 
-    allJsonFiles.forEach((jsonFilePath, index) => {
-        const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
-        const baseNameWithoutNumber = getBaseNameFromJsonName(jsonData.name);
-        const newNumberedName = `${baseNameWithoutNumber} #${shuffledNumbers[index]}`;
-        jsonData.name = newNumberedName;
-    
-        const jsonFileName = path.basename(jsonFilePath);
-        const imageFileName = getMatchingImageFileName(jsonFileName, path.dirname(jsonFilePath));
-    
-        if (!imageFileName) {
-            console.error(`No matching image file found for ${jsonFileName}`);
-            return; // Skip this iteration
-        }
-    
-        const imageFilePath = allImageFiles.find(filePath => path.basename(filePath) === imageFileName);
-    
-        if (!imageFilePath) {
-            console.error(`Image file path not found for ${imageFileName}`);
-            return; // Skip this iteration
-        }
-    
-        const newJsonName = `${newNumberedName}.json`;
-        const newImageName = `${newNumberedName}${path.extname(imageFileName)}`;
-    
-        fs.writeFileSync(path.join(outputDir, newJsonName), JSON.stringify(jsonData, null, 2));
-        fs.copyFileSync(imageFilePath, path.join(outputDir, newImageName));
-    });
-}
+    return startIndex + jsonFiles.length;
+};
+
+const renameFilesAndUpdateJson = (inputDirectory, outputDirectory, jsonFile, jsonDirectory, imageDirectory, number) => {
+    const jsonFilePath = path.join(inputDirectory, jsonDirectory, jsonFile);
+    const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
+
+    if (!jsonData.name) {
+        throw new Error(`Missing "name" attribute in ${jsonFile}`);
+    }
+
+    const imageFileName = getMatchingImageFileName(jsonFile, path.join(inputDirectory, imageDirectory));
+    if (!imageFileName) {
+        throw new Error(`No matching image file found for ${jsonFile}`);
+    }
+
+    const imageFilePath = path.join(inputDirectory, imageDirectory, imageFileName);
+
+    const baseNameWithoutNumber = getBaseNameFromJsonName(jsonData.name);
+    const newNumberedName = `${baseNameWithoutNumber} #${number}`;
+    const newJsonName = `${newNumberedName}.json`;
+    const newImageName = `${newNumberedName}${path.extname(imageFileName)}`;
+
+    jsonData.name = newNumberedName;
+
+    fs.copyFileSync(jsonFilePath, path.join(outputDirectory, jsonDirectory, newJsonName));
+    fs.copyFileSync(imageFilePath, path.join(outputDirectory, imageDirectory, newImageName));
+    fs.writeFileSync(path.join(outputDirectory, jsonDirectory, newJsonName), JSON.stringify(jsonData, null, 2));
+};
 
 
 
