@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Electron App</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="renderer.js" defer></script>
+</head>
+<body>
+    <div class="directory-container">
+        <div class="directory-entry">
+            <span class="directory-label">Input Directory: </span>
+            <span class="directory-path" id="start-directory-display">null</span>
+            <button class="directory-btn" id="start-directory">📂</button>
+        </div>
+        <div class="directory-entry">
+            <span class="directory-label">Output Directory: </span>
+            <span class="directory-path" id="output-directory-display">null</span>
+            <button class="directory-btn" id="output-directory">📂</button>
+        </div>
+        <div class="directory-entry">
+            <span class="directory-label">Second Input Directory: </span>
+            <span class="directory-path" id="second-input-directory-display">null</span>
+            <button class="directory-btn" id="second-input-directory">📂</button>
+        </div>
+        
+    </div>
+
+    <div class="app-container">
+        <button class="script-btn">Transform CSV to JSON format</button>
+        <button class="script-btn">Shuffle JSON and IMG files</button>
+        <button class="script-btn">Merge two directories</button>
+        <button class="script-btn">Reconstruct Numbering</button>
+        <button class="script-btn">Analyze Metadata</button>
+    </div>
+
+    
+</body>
+</html>
