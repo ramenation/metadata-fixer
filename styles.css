@@ -23,7 +23,7 @@ body {
 }
 
 .data-output {
-    flex: 1; // This ensures that it takes 1/3 of the available space
+    flex: 1;
     margin-left: 20px;
     display: flex;
     flex-direction: column;
@@ -32,8 +32,11 @@ body {
     border-radius: 5px;
     background-color: #fff;
     overflow-y: auto;
-    height: calc(100% - 20px); // Adjusted for padding
+    overflow-x: hidden; /* Added to hide horizontal overflow */
+    height: calc(100% - 20px);
     box-sizing: border-box;
+    word-wrap: break-word;
+    overflow-wrap: break-word; /* Added to handle really long words or strings */
 }
 
 .main-content {

@@ -1,12 +1,8 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const {  reconstructNumbering, validateDirectoryStructure, renameFilesAndUpdateJson, processDirectories, countTraitsInDirectory, findDuplicates } = require('./fileprocessor');
 
-
-// ... your code to create BrowserWindow etc...
-
-
+// Initialize the main application window
 let mainWindow;
-
 
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
@@ -21,23 +17,19 @@ app.on('ready', () => {
     mainWindow.loadFile('index.html');
 });
 
-ipcMain.handle('select-start-directory', async (event) => {
+// Utility function to open a directory selection dialog
+async function selectDirectory() {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
     if (canceled) {
         return null;
     } else {
         return filePaths[0];
     }
-});
+}
 
-ipcMain.handle('select-output-directory', async (event) => {
-    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
-    if (canceled) {
-        return null;
-    } else {
-        return filePaths[0];
-    }
-});
+// IPC Handlers for directory and file selections
+ipcMain.handle('select-start-directory', selectDirectory);
+ipcMain.handle('select-output-directory', selectDirectory);
 
 ipcMain.on('open-file-dialog', (event) => {
     const fileSelection = dialog.showOpenDialogSync({
@@ -53,14 +45,4 @@ ipcMain.on('open-file-dialog', (event) => {
     }
 });
 
-ipcMain.handle('select-second-input-directory', async () => {
-    const { filePaths } = await dialog.showOpenDialog(mainWindow, {
-        properties: ['openDirectory']
-    });
-
-    if (filePaths && filePaths.length > 0) {
-        return filePaths[0];
-    } else {
-        return null;
-    }
-});
+ipcMain.handle('select-second-input-directory', selectDirectory);

@@ -2,39 +2,68 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 
-let traitCounts = {};
 
-// 
-function countTraitsInDirectory(directoryPath,outputElement) {
-    walkDir(directoryPath);
-    console.log(traitCounts);
-    let displayText = '';
 
-    /*
-    for (const [trait, count] of Object.entries(traitCounts)) {
-        displayText += `${trait}: ${count}\n`;
-    }*/
+function countTraitsInDirectory(directoryPath, outputElement) {
+    const traitCounts = walkDir(directoryPath);
     const traitStrings = [];
     for (const [trait, countObj] of Object.entries(traitCounts)) {
-    traitStrings.push(objectToString(trait, countObj));
+        traitStrings.push(objectToString(trait, countObj));
     }
+    outputElement.textContent = traitStrings.join('\n\n');
+}
 
-// Join all the trait strings with a separator and display
-outputElement.textContent = traitStrings.join('\n\n');
-    
+function walkDir(dir) {
+    let traitCounts = {};
+    fs.readdirSync(dir).forEach(f => {
+        const dirPath = path.join(dir, f);
+        const isDirectory = fs.statSync(dirPath).isDirectory();
+        isDirectory ?
+            Object.assign(traitCounts, walkDir(dirPath)) :
+            path.extname(dirPath) === '.json' && Object.assign(traitCounts, processFile(dirPath, traitCounts));
+    });
+    return traitCounts;
 }
 
 
 
-function walkDir(dir) {
-    fs.readdirSync(dir).forEach(f => {
-        const dirPath = path.join(dir, f);
-        const isDirectory = fs.statSync(dirPath).isDirectory();
-        isDirectory ? walkDir(dirPath) : path.extname(dirPath) === '.json' && processFile(dirPath);
-    });
-};
+function objectToString(traitName, obj) {
+    let output = traitName + ':\n';
+    for (const [key, value] of Object.entries(obj)) {
+        output += key + ': ' + value + '\n';
+    }
+    return output;
+}
+// 
 
-function processFile(file) {
+function findDuplicates(directory, outputElement) {
+    const files = fs.readdirSync(directory);
+    const seenAttributes = new Map();
+    const duplicateFiles = [];
+
+    files.forEach(file => {
+        if (path.extname(file) === '.json') {
+            const filePath = path.join(directory, file);
+            const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            if (data.attributes) {
+                const sortedAttributes = data.attributes.sort((a, b) => a.trait_type.localeCompare(b.trait_type));
+                const attributeString = sortedAttributes.map(attr => `${attr.trait_type}:${attr.value}`).join(',');
+                if (seenAttributes.has(attributeString)) {
+                    duplicateFiles.push(file);
+                } else {
+                    seenAttributes.set(attributeString, file);
+                }
+            }
+        }
+    });
+
+    outputElement.textContent = duplicateFiles.length > 0 ? 
+        `Duplicate Files: \n${duplicateFiles.join('\n')}` : 
+        'No Duplicates Found!';
+}
+
+
+function processFile(file, traitCounts) {
     const data = JSON.parse(fs.readFileSync(file, 'utf8'));
 
     if (data.attributes && Array.isArray(data.attributes)) {
@@ -56,50 +85,8 @@ function processFile(file) {
             }
         });
     }
+    return traitCounts;
 }
-
-function objectToString(traitName, obj) {
-    let output = traitName + ':\n';
-    for (const [key, value] of Object.entries(obj)) {
-        output += key + ': ' + value + '\n';
-    }
-    return output;
-}
-
-function findDuplicates(directory,outputElement) {
-    const files = fs.readdirSync(directory);
-    const seenAttributes = new Map(); // To store unique combinations and their respective filenames
-    const duplicateFiles = [];
-
-    files.forEach(file => {
-        if (path.extname(file) === '.json') {
-            const filePath = path.join(directory, file);
-            const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-
-            if (data.attributes) {
-                // Sort attributes to ensure consistency in comparison
-                const sortedAttributes = data.attributes.sort((a, b) => a.trait_type.localeCompare(b.trait_type));
-                const attributeString = sortedAttributes.map(attr => `${attr.trait_type}:${attr.value}`).join(',');
-
-                if (seenAttributes.has(attributeString)) {
-                    duplicateFiles.push(file);  // If seen before, it's a duplicate
-                } else {
-                    seenAttributes.set(attributeString, file); // Otherwise, add to seenAttributes
-                }
-            }
-        }
-    });
-
-    // Output the results
-    if (duplicateFiles.length > 0) {
-        outputElement.textContent = `Duplicate Files: \n${duplicateFiles.join('\n')}`;
-    } else {
-        outputElement.textContent = 'No Duplicates Found!';
-    }
-}
-
-
-
 
 function getBaseNameFromJsonName(jsonName) {
     // This regex removes a hash "#" followed by digits at the end of the string.
@@ -153,48 +140,6 @@ function getMatchingImageFileName(jsonFileName, imageDirectory) {
     }
     return null;
 }
-
-/* why was this commented out lol  
-function renameFilesAndUpdateJson(inputDirectory, outputDirectory, jsonDirectory, imageDirectory) {
-    const jsonFiles = fs.readdirSync(path.join(inputDirectory, jsonDirectory)).filter(file => file.endsWith('.json'));
-    const shuffledNumbers = shuffleArray([...Array(jsonFiles.length).keys()].map(i => i + 1));
-
-    // Ensure output directories exist
-    ensureDirectoryExistence(path.join(outputDirectory, jsonDirectory));
-    ensureDirectoryExistence(path.join(outputDirectory, imageDirectory));
-
-    jsonFiles.forEach((jsonFile, index) => {
-        const jsonFilePath = path.join(inputDirectory, jsonDirectory, jsonFile);
-        const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
-
-        if (!jsonData.name) {
-            throw new Error(`Missing "name" attribute in ${jsonFile}`);
-        }
-
-        const imageFileName = getMatchingImageFileName(jsonFile, path.join(inputDirectory, imageDirectory));
-        if (!imageFileName) {
-            throw new Error(`No matching image file found for ${jsonFile}`);
-        }
-
-        const imageFilePath = path.join(inputDirectory, imageDirectory, imageFileName);
-
-        const baseNameWithoutNumber = getBaseNameFromJsonName(jsonData.name);
-        const newNumberedName = `${baseNameWithoutNumber} #${shuffledNumbers[index]}`;
-        const newJsonName = `${newNumberedName}.json`;
-        const newImageName = `${newNumberedName}${path.extname(imageFileName)}`;
-
-        jsonData.name = newNumberedName;
-
-        fs.copyFileSync(jsonFilePath, path.join(outputDirectory, jsonDirectory, newJsonName));
-        fs.copyFileSync(imageFilePath, path.join(outputDirectory, imageDirectory, newImageName));
-        fs.writeFileSync(path.join(outputDirectory, jsonDirectory, newJsonName), JSON.stringify(jsonData, null, 2));
-
-        // Optionally, delete the original files
-        //fs.unlinkSync(jsonFilePath);
-        //fs.unlinkSync(imageFilePath);
-    });
-}
-*/
 
 
 function processDirectories(startDirectory, outputDirectory) {
@@ -355,7 +300,6 @@ function reconstructNumbering(inputDirectory, outputDirectory) {
     console.log('Files renamed and reconstructed successfully!');
     alert('Files renamed and reconstructed successfully!');
 }
-
 
 
 
