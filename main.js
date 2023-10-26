@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const { validateDirectoryStructure, renameFilesAndUpdateJson, processDirectories } = require('./fileprocessor');
+const {  reconstructNumbering, validateDirectoryStructure, renameFilesAndUpdateJson, processDirectories, countTraitsInDirectory, findDuplicates } = require('./fileprocessor');
 
 
 // ... your code to create BrowserWindow etc...
@@ -10,8 +10,8 @@ let mainWindow;
 
 app.on('ready', () => {
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 1200,
+        height: 800,
         webPreferences: {
             contextIsolation: false,
             enableRemoteModule: true,
@@ -40,16 +40,17 @@ ipcMain.handle('select-output-directory', async (event) => {
 });
 
 ipcMain.on('open-file-dialog', (event) => {
-    dialog.showOpenDialog({
-        properties: ['openFile'],
-        filters: [{ name: 'CSV', extensions: ['csv'] }]
-    }).then(result => {
-        if (!result.canceled && result.filePaths.length > 0) {
-            event.sender.send('selected-file', result.filePaths[0]);
-        }
-    }).catch(err => {
-        console.log(err);
+    const fileSelection = dialog.showOpenDialogSync({
+        title: "Select CSV file",
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+        properties: ['openFile']
     });
+    
+    if (fileSelection && fileSelection.length > 0) {
+        event.reply('selected-file', fileSelection[0]);
+    } else {
+        event.reply('selected-file', null);
+    }
 });
 
 ipcMain.handle('select-second-input-directory', async () => {

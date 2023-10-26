@@ -5,8 +5,10 @@ document.querySelector('button').addEventListener('click', () => {
     console.log("A button was clicked.");
 });
 
+
 const { ipcRenderer } = require('electron');
-const { processDirectories, processCsvToJSON, mergeDirectoriesAndProcessFiles } = require('./fileprocessor');
+const { processDirectories, processCsvToJSON, mergeDirectoriesAndProcessFiles, countTraitsInDirectory, findDuplicates,  reconstructNumbering } = require('./fileprocessor');
+const outputElement = document.getElementById('output');
 
 let startDirectory = null;
 let outputDirectory = null;
@@ -43,17 +45,18 @@ document.getElementById('second-input-directory').addEventListener('click', () =
 });
 
 
-ipcRenderer.on('selected-file', (event, path) => {
-    // Here you have the path from the dialog in the main process
-    console.log(`Selected CSV File: ${path}`);
-    // Now, you can call your function to process the CSV
-    processCsvToJSON(path, outputDirectory);
+ipcRenderer.on('selected-file', (event, filePath) => {
+    if (filePath) {
+        processCsvToJSON(filePath,outputDirectory);
+    } else {
+        console.error("No file selected");
+    }
 });
 
 const scriptButtons = document.querySelectorAll('.script-btn');
 console.log(scriptButtons);
 document.querySelector('.script-btn').addEventListener('click', () => {
-    console.log("First script button was clicked.");
+    console.log(" script button was clicked.");
 });
 scriptButtons.forEach((btn, index) => {
     btn.addEventListener('click', () => {
@@ -73,7 +76,13 @@ scriptButtons.forEach((btn, index) => {
                 mergeDirectoriesAndProcessFiles(startDirectory, secondInputDirectory, outputDirectory);
                 break;
             case 3:
-                runScript4(startDirectory, outputDirectory);
+                reconstructNumbering(startDirectory, outputDirectory);
+                break;
+            case 4:
+                countTraitsInDirectory(startDirectory, outputElement);
+                break;
+            case 5:
+                findDuplicates(startDirectory,outputElement);
                 break;
             default:
                 console.error('Invalid Script');
